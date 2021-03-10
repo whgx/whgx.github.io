@@ -1,54 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>Hyper-V和IDEA运行端口占用问题</title>
-    <url>/2020/07/25/Hyper-V%E5%92%8CIDEA%E8%BF%90%E8%A1%8C%E7%AB%AF%E5%8F%A3%E5%8D%A0%E7%94%A8%E9%97%AE%E9%A2%98/</url>
-    <content><![CDATA[<h4 id="原因分析"><a href="#原因分析" class="headerlink" title="原因分析"></a>原因分析</h4><p>首先我们可以查看一下我们系统默认的端口占用范围；</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">Copy</span><br><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line"></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">1024</span></span><br><span class="line">端口数          : <span class="number">13977</span></span><br></pre></td></tr></table></figure>
-<p>我们可以看到Windows系统默认的tcp 动态端口范围为：1024~13977。当我们开启Hyper-V后，系统默认会分配给一些保留端口供Hyper-V使用：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="class"><span class="keyword">interface</span> <span class="title">ipv4</span> <span class="title">show</span> <span class="title">excludedportrange</span> <span class="title">protocol</span></span>=tcp</span><br><span class="line">协议 tcp 端口排除范围</span><br><span class="line"> </span><br><span class="line">开始端口    结束端口</span><br><span class="line">----------    --------</span><br><span class="line">      <span class="number">1026</span>        <span class="number">1125</span></span><br><span class="line">      <span class="number">1226</span>        <span class="number">1325</span></span><br><span class="line">      <span class="number">1326</span>        <span class="number">1425</span></span><br><span class="line">      <span class="number">1426</span>        <span class="number">1525</span></span><br><span class="line">      <span class="number">1526</span>        <span class="number">1625</span></span><br><span class="line">      <span class="number">2180</span>        <span class="number">2279</span></span><br></pre></td></tr></table></figure>
-<p>我们可以看到IDEA运行Tomcat需要JMX的1099端口刚好在端口排除范围中，这样就导致了IDEA需要使用1099端口是会被占用，这样你当然就不能运行了。</p>
-<h4 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h4><p>使用管理员身份运行cmd，重置端口，然后重启</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh winsock reset</span><br></pre></td></tr></table></figure>
-<p>这样你的tcp端口排除范围可能刚好不包含1099端口，这样你当然就可以用你的IDEA运行Tomcat应用了。但是你啥时候会出现就不得而知了。</p>
-<h4 id="终极解决"><a href="#终极解决" class="headerlink" title="终极解决"></a>终极解决</h4><p>3.1 关闭Hyper-V#</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line">dism.exe /Online /Disable-Feature:Microsoft-Hyper-V</span><br></pre></td></tr></table></figure>
-<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
-<p>3.2 修改动态端口范围#<br>使用管理员身份运行cmd</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport tcp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport udp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br></pre></td></tr></table></figure>
-<p>确定。<br>然后检查结果</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">49152</span></span><br><span class="line">端口数          : <span class="number">16383</span></span><br></pre></td></tr></table></figure>
-<p>3.3 开启Hyper-V#</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">dism.exe /Online /Enable-Feature:Microsoft-Hyper-V /All</span><br><span class="line">部署映像服务和管理工具</span><br><span class="line">版本: <span class="number">10.0</span><span class="number">.18362</span><span class="number">.1</span></span><br><span class="line">映像版本: <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span></span><br><span class="line">启用一个或多个功能</span><br><span class="line">[==========================<span class="number">100.0</span>%==========================]</span><br><span class="line">操作成功完成。</span><br><span class="line">重新启动 Windows 以完成该操作。</span><br><span class="line">是否立即重新启动计算机? (Y/N)</span><br><span class="line">开启Hyper-V</span><br></pre></td></tr></table></figure>
-<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
-<blockquote>
-<p>使用终极解决方案解决之后，你会发现你的IDEA又可以正常运行了。另外这里说一个单独排除端口的命令，后面可能会用到：</p>
-</blockquote>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 add excludedportrange protocol=tcp startport=<span class="number">50051</span> numberofports=<span class="number">1</span></span><br></pre></td></tr></table></figure>
-<p>使用上面的命令之后我们就可以单独排除某个端口了，保障改端口不会被其他应用占用。</p>
-<blockquote>
-<p><a href="https://www.kairlec.com/archives/285" target="_blank" rel="noopener">https://www.kairlec.com/archives/285</a><br><a href="https://www.cnblogs.com/eelve/p/12679125.html" target="_blank" rel="noopener">https://www.cnblogs.com/eelve/p/12679125.html</a></p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>问题</category>
-      </categories>
-  </entry>
-  <entry>
     <title>IntelliJ IDEA必装插件</title>
     <url>/2020/07/25/IntelliJ%20IDEA%E5%BF%85%E8%A3%85%E6%8F%92%E4%BB%B6/</url>
     <content><![CDATA[<p>1</p>
 ]]></content>
       <categories>
         <category>IDEA</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>Markdown语法</title>
-    <url>/2021/03/10/Markdown%E8%AF%AD%E6%B3%95/</url>
-    <content><![CDATA[]]></content>
-      <categories>
-        <category>Markdown</category>
       </categories>
   </entry>
   <entry>
@@ -86,17 +44,72 @@
       </categories>
   </entry>
   <entry>
-    <title>SVN迁移GIT</title>
-    <url>/2020/07/25/SVN%E8%BF%81%E7%A7%BBGIT/</url>
-    <content><![CDATA[<h4 id="迁移过程"><a href="#迁移过程" class="headerlink" title="迁移过程"></a>迁移过程</h4><ol>
-<li>拉取svn代码并转为git（输入用户名密码） <figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git svn clone   http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure>
- <img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589770874769.png" alt=""></li>
-<li>关联远程仓库(保证仓库是新建的并且没有任何提交)<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">cd project/</span><br><span class="line">git remote add origin http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure></li>
-<li>提交<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git push -u origin master</span><br></pre></td></tr></table></figure></li>
+    <title>Markdown语法</title>
+    <url>/2021/03/10/Markdown%E8%AF%AD%E6%B3%95/</url>
+    <content><![CDATA[]]></content>
+      <categories>
+        <category>Markdown</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Hyper-V和IDEA运行端口占用问题</title>
+    <url>/2020/07/25/Hyper-V%E5%92%8CIDEA%E8%BF%90%E8%A1%8C%E7%AB%AF%E5%8F%A3%E5%8D%A0%E7%94%A8%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<h4 id="原因分析"><a href="#原因分析" class="headerlink" title="原因分析"></a>原因分析</h4><p>首先我们可以查看一下我们系统默认的端口占用范围；</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">Copy</span><br><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line"></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">1024</span></span><br><span class="line">端口数          : <span class="number">13977</span></span><br></pre></td></tr></table></figure>
+<p>我们可以看到Windows系统默认的tcp 动态端口范围为：1024~13977。当我们开启Hyper-V后，系统默认会分配给一些保留端口供Hyper-V使用：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="class"><span class="keyword">interface</span> <span class="title">ipv4</span> <span class="title">show</span> <span class="title">excludedportrange</span> <span class="title">protocol</span></span>=tcp</span><br><span class="line">协议 tcp 端口排除范围</span><br><span class="line"> </span><br><span class="line">开始端口    结束端口</span><br><span class="line">----------    --------</span><br><span class="line">      <span class="number">1026</span>        <span class="number">1125</span></span><br><span class="line">      <span class="number">1226</span>        <span class="number">1325</span></span><br><span class="line">      <span class="number">1326</span>        <span class="number">1425</span></span><br><span class="line">      <span class="number">1426</span>        <span class="number">1525</span></span><br><span class="line">      <span class="number">1526</span>        <span class="number">1625</span></span><br><span class="line">      <span class="number">2180</span>        <span class="number">2279</span></span><br></pre></td></tr></table></figure>
+<p>我们可以看到IDEA运行Tomcat需要JMX的1099端口刚好在端口排除范围中，这样就导致了IDEA需要使用1099端口是会被占用，这样你当然就不能运行了。</p>
+<h4 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h4><p>使用管理员身份运行cmd，重置端口，然后重启</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh winsock reset</span><br></pre></td></tr></table></figure>
+<p>这样你的tcp端口排除范围可能刚好不包含1099端口，这样你当然就可以用你的IDEA运行Tomcat应用了。但是你啥时候会出现就不得而知了。</p>
+<h4 id="终极解决"><a href="#终极解决" class="headerlink" title="终极解决"></a>终极解决</h4><p>3.1 关闭Hyper-V#</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line">dism.exe /Online /Disable-Feature:Microsoft-Hyper-V</span><br></pre></td></tr></table></figure>
+<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
+<p>3.2 修改动态端口范围#<br>使用管理员身份运行cmd</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport tcp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport udp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br></pre></td></tr></table></figure>
+<p>确定。<br>然后检查结果</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">49152</span></span><br><span class="line">端口数          : <span class="number">16383</span></span><br></pre></td></tr></table></figure>
+<p>3.3 开启Hyper-V#</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">dism.exe /Online /Enable-Feature:Microsoft-Hyper-V /All</span><br><span class="line">部署映像服务和管理工具</span><br><span class="line">版本: <span class="number">10.0</span><span class="number">.18362</span><span class="number">.1</span></span><br><span class="line">映像版本: <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span></span><br><span class="line">启用一个或多个功能</span><br><span class="line">[==========================<span class="number">100.0</span>%==========================]</span><br><span class="line">操作成功完成。</span><br><span class="line">重新启动 Windows 以完成该操作。</span><br><span class="line">是否立即重新启动计算机? (Y/N)</span><br><span class="line">开启Hyper-V</span><br></pre></td></tr></table></figure>
+<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
+<blockquote>
+<p>使用终极解决方案解决之后，你会发现你的IDEA又可以正常运行了。另外这里说一个单独排除端口的命令，后面可能会用到：</p>
+</blockquote>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 add excludedportrange protocol=tcp startport=<span class="number">50051</span> numberofports=<span class="number">1</span></span><br></pre></td></tr></table></figure>
+<p>使用上面的命令之后我们就可以单独排除某个端口了，保障改端口不会被其他应用占用。</p>
+<blockquote>
+<p><a href="https://www.kairlec.com/archives/285" target="_blank" rel="noopener">https://www.kairlec.com/archives/285</a><br><a href="https://www.cnblogs.com/eelve/p/12679125.html" target="_blank" rel="noopener">https://www.cnblogs.com/eelve/p/12679125.html</a></p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>问题</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Nexus从windows迁移至Linux</title>
+    <url>/2020/07/25/Nexus%E4%BB%8Ewindows%E8%BF%81%E7%A7%BB%E8%87%B3Linux/</url>
+    <content><![CDATA[<h4 id="下载nexus-linux包"><a href="#下载nexus-linux包" class="headerlink" title="下载nexus linux包"></a>下载nexus linux包</h4><p>官网下载地址：<a href="https://www.sonatype.com/download-oss-sonatype" target="_blank" rel="noopener">https://www.sonatype.com/download-oss-sonatype</a><br>将软件包上传至服务器–&gt;创建nexus目录 –&gt;创建用户–&gt;解压缩包–&gt;将原平台文件包迁移至nexus目录–&gt;授权–&gt;启动：</p>
+<ol>
+<li><p>创建用户</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"># useradd nexus</span><br><span class="line"># id nexus</span><br><span class="line">uid=<span class="number">1002</span>(nexus) gid=<span class="number">1002</span>(nexus) groups=<span class="number">1002</span>(nexus)</span><br></pre></td></tr></table></figure></li>
+<li><p>创建nexus目录</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># mkdir /usr/local/nexus</span><br></pre></td></tr></table></figure></li>
+<li><p>解压缩包</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># tar xf nexus-3.13.0-01-unix.tar.gz -C /usr/local/nexus/</span><br></pre></td></tr></table></figure></li>
+<li><p>将sonatype-work文件移走</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># mv sonatype-work /tmp</span><br></pre></td></tr></table></figure></li>
+<li><p>到老平台将文件目录sonatype-work打包并传至新nexus服务器</p>
+</li>
+<li><p>授权</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># chown -R nexus.nexus /usr/lcaol/nexus/</span><br></pre></td></tr></table></figure></li>
+<li><p>切换至nexus用户并启动nexus</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"># su - nexus</span><br><span class="line">$ /usr/local/nexus/nexus-<span class="number">3.13</span><span class="number">.0</span>-<span class="number">01</span>/bin/nexus start</span><br></pre></td></tr></table></figure></li>
+<li><p>查看是否启动成功</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># ps -ef|grep nexus</span><br></pre></td></tr></table></figure></li>
 </ol>
 ]]></content>
       <categories>
-        <category>SVN</category>
+        <category>NEXUS</category>
       </categories>
   </entry>
   <entry>
@@ -121,6 +134,28 @@
 ]]></content>
       <categories>
         <category>问题</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>SVN迁移GIT</title>
+    <url>/2020/07/25/SVN%E8%BF%81%E7%A7%BBGIT/</url>
+    <content><![CDATA[<h4 id="迁移过程"><a href="#迁移过程" class="headerlink" title="迁移过程"></a>迁移过程</h4><ol>
+<li>拉取svn代码并转为git（输入用户名密码） <figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git svn clone   http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure>
+ <img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589770874769.png" alt=""></li>
+<li>关联远程仓库(保证仓库是新建的并且没有任何提交)<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">cd project/</span><br><span class="line">git remote add origin http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure></li>
+<li>提交<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git push -u origin master</span><br></pre></td></tr></table></figure></li>
+</ol>
+]]></content>
+      <categories>
+        <category>SVN</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Tomcat配置JMX</title>
+    <url>/2020/10/21/Tomcat%E9%85%8D%E7%BD%AEJMX/</url>
+    <content><![CDATA[<h4 id="配置JMX"><a href="#配置JMX" class="headerlink" title="配置JMX"></a>配置JMX</h4><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">-Dcom.sun.management.jmxremote.port&#x3D;12321</span><br><span class="line">-Dcom.sun.management.jmxremote.ssl&#x3D;false</span><br><span class="line">-Dcom.sun.management.jmxremote.authenticate&#x3D;false</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>TOMCAT</category>
       </categories>
   </entry>
   <entry>
@@ -156,6 +191,50 @@
 ]]></content>
       <categories>
         <category>Nginx</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Tomcat7迁移Tomcat8中文乱码问题</title>
+    <url>/2020/10/22/Tomcat7%E8%BF%81%E7%A7%BBTomcat8%E4%B8%AD%E6%96%87%E4%B9%B1%E7%A0%81%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><blockquote>
+<p>线上工程原用Tomcat7,改用Tomcat8以后发生登录不上去。定位问题是发现是由于乱码JS加载失败。<br>因为win10系统的默认字符集是GBK，而 java 虚拟机在启动时，会读取该字符集。而我们的项目一般会设置为 UTF-8。而 Tomcat 本质上也是依赖于 JDK，所以自然会出现中文乱码。</p>
+</blockquote>
+<h4 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h4><ul>
+<li>Tomcat7对URI默认编码是ISO-8859-1</li>
+<li>Tomcat8对URI默认编码是UTF-8</li>
+</ul>
+<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h4><p>设置tomcat中catalina.bat</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">set &quot;JAVA_OPTS&#x3D;%JAVA_OPTS% -Dfile.encoding&#x3D;UTF-8&quot;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+</blockquote>
+<ul>
+<li>引用1：<a href="https://my.oschina.net/ijustdoit/blog/397481" target="_blank" rel="noopener">https://my.oschina.net/ijustdoit/blog/397481</a></li>
+<li>引用2: <a href="https://www.jianshu.com/p/bb7d3d986796" target="_blank" rel="noopener">https://www.jianshu.com/p/bb7d3d986796</a></li>
+</ul>
+]]></content>
+  </entry>
+  <entry>
+    <title>优秀源码推荐</title>
+    <url>/2020/07/25/%E4%BC%98%E7%A7%80%E6%BA%90%E7%A0%81%E6%8E%A8%E8%8D%90/</url>
+    <content><![CDATA[<p>工程</p>
+]]></content>
+      <categories>
+        <category>CODE</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Mybatis中tinyint(1)转化为boolean</title>
+    <url>/2020/07/25/mybatis-zhong-tinyint1zhuan-hua-wei-boolean/</url>
+    <content><![CDATA[<h4 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述:"></a>问题描述:</h4><p>使用Mybatis查询tinyint(1)字段数据,返回值为Map类型,那么tinyint(1)的数据默认会转化为boolean类型数据.</p>
+<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案:"></a>解决方案:</h4><ol>
+<li>使用ifnull(column, 0)处理该字段,个人测试过可以;</li>
+<li>在jdbcUrl添加参数: tinyInt1isBit=false（默认为true）；</li>
+<li>避免使用长度为1的tinyint类型字段存储数字格式的数据;</li>
+</ol>
+]]></content>
+      <categories>
+        <category>MYBATIS</category>
       </categories>
   </entry>
   <entry>
@@ -197,33 +276,6 @@
       </categories>
   </entry>
   <entry>
-    <title>Nexus从windows迁移至Linux</title>
-    <url>/2020/07/25/Nexus%E4%BB%8Ewindows%E8%BF%81%E7%A7%BB%E8%87%B3Linux/</url>
-    <content><![CDATA[<h4 id="下载nexus-linux包"><a href="#下载nexus-linux包" class="headerlink" title="下载nexus linux包"></a>下载nexus linux包</h4><p>官网下载地址：<a href="https://www.sonatype.com/download-oss-sonatype" target="_blank" rel="noopener">https://www.sonatype.com/download-oss-sonatype</a><br>将软件包上传至服务器–&gt;创建nexus目录 –&gt;创建用户–&gt;解压缩包–&gt;将原平台文件包迁移至nexus目录–&gt;授权–&gt;启动：</p>
-<ol>
-<li><p>创建用户</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"># useradd nexus</span><br><span class="line"># id nexus</span><br><span class="line">uid=<span class="number">1002</span>(nexus) gid=<span class="number">1002</span>(nexus) groups=<span class="number">1002</span>(nexus)</span><br></pre></td></tr></table></figure></li>
-<li><p>创建nexus目录</p>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># mkdir /usr/local/nexus</span><br></pre></td></tr></table></figure></li>
-<li><p>解压缩包</p>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># tar xf nexus-3.13.0-01-unix.tar.gz -C /usr/local/nexus/</span><br></pre></td></tr></table></figure></li>
-<li><p>将sonatype-work文件移走</p>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># mv sonatype-work /tmp</span><br></pre></td></tr></table></figure></li>
-<li><p>到老平台将文件目录sonatype-work打包并传至新nexus服务器</p>
-</li>
-<li><p>授权</p>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># chown -R nexus.nexus /usr/lcaol/nexus/</span><br></pre></td></tr></table></figure></li>
-<li><p>切换至nexus用户并启动nexus</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"># su - nexus</span><br><span class="line">$ /usr/local/nexus/nexus-<span class="number">3.13</span><span class="number">.0</span>-<span class="number">01</span>/bin/nexus start</span><br></pre></td></tr></table></figure></li>
-<li><p>查看是否启动成功</p>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"># ps -ef|grep nexus</span><br></pre></td></tr></table></figure></li>
-</ol>
-]]></content>
-      <categories>
-        <category>NEXUS</category>
-      </categories>
-  </entry>
-  <entry>
     <title>Hello World</title>
     <url>/2020/07/24/hello-world/</url>
     <content><![CDATA[<p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
@@ -242,28 +294,6 @@
 ]]></content>
   </entry>
   <entry>
-    <title>Tomcat配置JMX</title>
-    <url>/2020/10/21/Tomcat%E9%85%8D%E7%BD%AEJMX/</url>
-    <content><![CDATA[<h4 id="配置JMX"><a href="#配置JMX" class="headerlink" title="配置JMX"></a>配置JMX</h4><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">-Dcom.sun.management.jmxremote.port&#x3D;12321</span><br><span class="line">-Dcom.sun.management.jmxremote.ssl&#x3D;false</span><br><span class="line">-Dcom.sun.management.jmxremote.authenticate&#x3D;false</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>TOMCAT</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>Mybatis中tinyint(1)转化为boolean</title>
-    <url>/2020/07/25/mybatis-zhong-tinyint1zhuan-hua-wei-boolean/</url>
-    <content><![CDATA[<h4 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述:"></a>问题描述:</h4><p>使用Mybatis查询tinyint(1)字段数据,返回值为Map类型,那么tinyint(1)的数据默认会转化为boolean类型数据.</p>
-<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案:"></a>解决方案:</h4><ol>
-<li>使用ifnull(column, 0)处理该字段,个人测试过可以;</li>
-<li>在jdbcUrl添加参数: tinyInt1isBit=false（默认为true）；</li>
-<li>避免使用长度为1的tinyint类型字段存储数字格式的数据;</li>
-</ol>
-]]></content>
-      <categories>
-        <category>MYBATIS</category>
-      </categories>
-  </entry>
-  <entry>
     <title>第一篇</title>
     <url>/2020/07/25/%E7%AC%AC%E4%B8%80%E7%AF%87/</url>
     <content><![CDATA[<h1 id="标题"><a href="#标题" class="headerlink" title="标题"></a>标题</h1><p>这是一篇<code>测试</code>文章</p>
@@ -277,15 +307,6 @@
         <tag>Hexo</tag>
         <tag>Markdown</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>优秀源码推荐</title>
-    <url>/2020/07/25/%E4%BC%98%E7%A7%80%E6%BA%90%E7%A0%81%E6%8E%A8%E8%8D%90/</url>
-    <content><![CDATA[<p>工程</p>
-]]></content>
-      <categories>
-        <category>CODE</category>
-      </categories>
   </entry>
   <entry>
     <title>问题总结</title>
@@ -313,26 +334,5 @@
       <categories>
         <category>问题</category>
       </categories>
-  </entry>
-  <entry>
-    <title>Tomcat7迁移Tomcat8中文乱码问题</title>
-    <url>/2020/10/22/Tomcat7%E8%BF%81%E7%A7%BBTomcat8%E4%B8%AD%E6%96%87%E4%B9%B1%E7%A0%81%E9%97%AE%E9%A2%98/</url>
-    <content><![CDATA[<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><blockquote>
-<p>线上工程原用Tomcat7,改用Tomcat8以后发生登录不上去。定位问题是发现是由于乱码JS加载失败。<br>因为win10系统的默认字符集是GBK，而 java 虚拟机在启动时，会读取该字符集。而我们的项目一般会设置为 UTF-8。而 Tomcat 本质上也是依赖于 JDK，所以自然会出现中文乱码。</p>
-</blockquote>
-<h4 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h4><ul>
-<li>Tomcat7对URI默认编码是ISO-8859-1</li>
-<li>Tomcat8对URI默认编码是UTF-8</li>
-</ul>
-<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h4><p>设置tomcat中catalina.bat</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">set &quot;JAVA_OPTS&#x3D;%JAVA_OPTS% -Dfile.encoding&#x3D;UTF-8&quot;</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-</blockquote>
-<ul>
-<li>引用1：<a href="https://my.oschina.net/ijustdoit/blog/397481" target="_blank" rel="noopener">https://my.oschina.net/ijustdoit/blog/397481</a></li>
-<li>引用2: <a href="https://www.jianshu.com/p/bb7d3d986796" target="_blank" rel="noopener">https://www.jianshu.com/p/bb7d3d986796</a></li>
-</ul>
-]]></content>
   </entry>
 </search>
