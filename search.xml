@@ -1,35 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>问题总结</title>
-    <url>/2020/07/25/2ZTgQPbdp/</url>
-    <content><![CDATA[<blockquote>
-<p>线上同事发现了一个问题，更新常量类里面的常量后发现没出现效果，反编译后看结果没变….后续查资料结果：<br>程序中使用的各种常量用一个类来统一管理，类似：</p>
+    <title>Hyper-V和IDEA运行端口占用问题</title>
+    <url>/2020/07/25/Hyper-V%E5%92%8CIDEA%E8%BF%90%E8%A1%8C%E7%AB%AF%E5%8F%A3%E5%8D%A0%E7%94%A8%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<h4 id="原因分析"><a href="#原因分析" class="headerlink" title="原因分析"></a>原因分析</h4><p>首先我们可以查看一下我们系统默认的端口占用范围；</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">Copy</span><br><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line"></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">1024</span></span><br><span class="line">端口数          : <span class="number">13977</span></span><br></pre></td></tr></table></figure>
+<p>我们可以看到Windows系统默认的tcp 动态端口范围为：1024~13977。当我们开启Hyper-V后，系统默认会分配给一些保留端口供Hyper-V使用：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="class"><span class="keyword">interface</span> <span class="title">ipv4</span> <span class="title">show</span> <span class="title">excludedportrange</span> <span class="title">protocol</span></span>=tcp</span><br><span class="line">协议 tcp 端口排除范围</span><br><span class="line"> </span><br><span class="line">开始端口    结束端口</span><br><span class="line">----------    --------</span><br><span class="line">      <span class="number">1026</span>        <span class="number">1125</span></span><br><span class="line">      <span class="number">1226</span>        <span class="number">1325</span></span><br><span class="line">      <span class="number">1326</span>        <span class="number">1425</span></span><br><span class="line">      <span class="number">1426</span>        <span class="number">1525</span></span><br><span class="line">      <span class="number">1526</span>        <span class="number">1625</span></span><br><span class="line">      <span class="number">2180</span>        <span class="number">2279</span></span><br></pre></td></tr></table></figure>
+<p>我们可以看到IDEA运行Tomcat需要JMX的1099端口刚好在端口排除范围中，这样就导致了IDEA需要使用1099端口是会被占用，这样你当然就不能运行了。</p>
+<h4 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h4><p>使用管理员身份运行cmd，重置端口，然后重启</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh winsock reset</span><br></pre></td></tr></table></figure>
+<p>这样你的tcp端口排除范围可能刚好不包含1099端口，这样你当然就可以用你的IDEA运行Tomcat应用了。但是你啥时候会出现就不得而知了。</p>
+<h4 id="终极解决"><a href="#终极解决" class="headerlink" title="终极解决"></a>终极解决</h4><p>3.1 关闭Hyper-V#</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line">dism.exe /Online /Disable-Feature:Microsoft-Hyper-V</span><br></pre></td></tr></table></figure>
+<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
+<p>3.2 修改动态端口范围#<br>使用管理员身份运行cmd</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport tcp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport udp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br></pre></td></tr></table></figure>
+<p>确定。<br>然后检查结果</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">49152</span></span><br><span class="line">端口数          : <span class="number">16383</span></span><br></pre></td></tr></table></figure>
+<p>3.3 开启Hyper-V#</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">dism.exe /Online /Enable-Feature:Microsoft-Hyper-V /All</span><br><span class="line">部署映像服务和管理工具</span><br><span class="line">版本: <span class="number">10.0</span><span class="number">.18362</span><span class="number">.1</span></span><br><span class="line">映像版本: <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span></span><br><span class="line">启用一个或多个功能</span><br><span class="line">[==========================<span class="number">100.0</span>%==========================]</span><br><span class="line">操作成功完成。</span><br><span class="line">重新启动 Windows 以完成该操作。</span><br><span class="line">是否立即重新启动计算机? (Y/N)</span><br><span class="line">开启Hyper-V</span><br></pre></td></tr></table></figure>
+<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
+<blockquote>
+<p>使用终极解决方案解决之后，你会发现你的IDEA又可以正常运行了。另外这里说一个单独排除端口的命令，后面可能会用到：</p>
 </blockquote>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppConst</span> </span>&#123;  </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_1 = <span class="string">"String1"</span>;  </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_2 = <span class="string">"String2"</span>;  </span><br><span class="line">    ......  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>然后在某些逻辑代码段里使用了这些常量。这样做可以便于管理常量，避免了大量的magic number/text，在修改常量内容时只需改这一个类就行了，但有时候会奇怪地发现，重新编译打包的程序依旧我行我素，并没有即时反应我们对常量的修改，这是何解呢？<br>在之前的《JVM学习笔记三–类的初始化》中我曾提到，静态常量（即用 static final 修饰的变量）是编译时常量，当一个class文件编译完毕，它内部使用到的所有常量的具体值就已经确定了，不能想当然地以为它在运行时并连接常量管理类之 后才会以引用方式使用常量。比如下面这段代码：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> AppConst;  </span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SomeService</span> </span>&#123;  </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">serviceJob1</span><span class="params">()</span> </span>&#123;  </span><br><span class="line">        System.out.println(AppConst.STR_1);  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>类SomeService使用了STR_1这个常量，表面上是通过AppConst类取得的这个值，实际上在SomeService被编译后，其代码其实变成了</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SomeService</span> </span>&#123;  </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">serviceJob1</span><span class="params">()</span> </span>&#123;  </span><br><span class="line">        System.out.println(<span class="string">"String1"</span>);  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里面根本没有AppConst什么事，所以你即使修改了AppConst的相关常量，令STR_1 = “NotString1”,SomeService可能依然会打印”String1”,因为SomeService的代码没有任何修改，在增量编译的情况 下，它的class文件不会被重新编译。<br>明白了上面这些，大致就知道怎么办了，我的方法有两个：</p>
-<ol>
-<li>原始条件下，删除class文件后手动重编译。</li>
-<li>使用IDE的时候， 先对SomeService做一个细微修改并保存（会自动编译），然后再修改回来并保存（再次自动编译）。如此class文件就会被更新了。<br>是这样的，单纯的修改静态变量是没用的，还要重新编辑所有引用静态变量的类，不然不会生效的。<br>改成 <figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppConst</span> </span>&#123;    </span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="title">getString2</span><span class="params">()</span></span>&#123;   </span><br><span class="line">              <span class="keyword">return</span> <span class="string">"String2"</span>;    </span><br><span class="line">  &#125;   </span><br><span class="line">  ......    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-就可以仅仅修改并编译一个类就行了 .<br>从根本上来解决此问题得这么做，最简单。<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppConst</span> </span>&#123;     </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_1 = <span class="keyword">new</span> String(<span class="string">"String1"</span>);     </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_2 = <span class="keyword">new</span> String(<span class="string">"String2"</span>);     </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> number1=<span class="keyword">new</span> Integer(<span class="number">123</span>);   </span><br><span class="line">    ......     </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-反编译，你会发现在引用此静态类属性的时候，引用代码不是直接用具体值替代，而还是源代码里的引用。<blockquote>
-<p>一句话总结，在静态类里定义的静态属性，坚决不用引用类型，而需要用对象类型。</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 add excludedportrange protocol=tcp startport=<span class="number">50051</span> numberofports=<span class="number">1</span></span><br></pre></td></tr></table></figure>
+<p>使用上面的命令之后我们就可以单独排除某个端口了，保障改端口不会被其他应用占用。</p>
+<blockquote>
+<p><a href="https://www.kairlec.com/archives/285" target="_blank" rel="noopener">https://www.kairlec.com/archives/285</a><br><a href="https://www.cnblogs.com/eelve/p/12679125.html" target="_blank" rel="noopener">https://www.cnblogs.com/eelve/p/12679125.html</a></p>
 </blockquote>
-</li>
-</ol>
 ]]></content>
       <categories>
         <category>问题</category>
       </categories>
   </entry>
   <entry>
+    <title>IntelliJ IDEA必装插件</title>
+    <url>/2020/07/25/IntelliJ%20IDEA%E5%BF%85%E8%A3%85%E6%8F%92%E4%BB%B6/</url>
+    <content><![CDATA[<p>1</p>
+]]></content>
+      <categories>
+        <category>IDEA</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Markdown语法</title>
+    <url>/2021/03/10/Markdown%E8%AF%AD%E6%B3%95/</url>
+    <content><![CDATA[]]></content>
+      <categories>
+        <category>Markdown</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>CentOS7配置nexus开机自启动</title>
+    <url>/2020/07/25/CentOS7%E9%85%8D%E7%BD%AEnexus%E5%BC%80%E6%9C%BA%E8%87%AA%E5%90%AF%E5%8A%A8/</url>
+    <content><![CDATA[<h4 id="新建nexus启动脚本"><a href="#新建nexus启动脚本" class="headerlink" title="新建nexus启动脚本"></a>新建nexus启动脚本</h4><p>进入/etc/init.d目录，新建脚本文件nexus</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 进入/etc/init.d</span></span><br><span class="line">[root@linux_maven etc]# cd /etc/init.d/</span><br><span class="line"> </span><br><span class="line"><span class="comment">// 新建脚本文件nexus</span></span><br><span class="line">[root@linux_maven init.d]# vim nexus</span><br></pre></td></tr></table></figure>
+<p>脚本内容:</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line">#chkconfig:2345 20 90</span><br><span class="line">#description:nexus</span><br><span class="line">#processname:nexus</span><br><span class="line"> </span><br><span class="line">export JAVA_HOME=/root/apps/jdk1<span class="number">.8</span>/</span><br><span class="line"> </span><br><span class="line"><span class="keyword">case</span> $<span class="number">1</span> in</span><br><span class="line">        start) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus start;;</span><br><span class="line">        stop) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus stop;;</span><br><span class="line">        status) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus status;;</span><br><span class="line">        restart) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus restart;;</span><br><span class="line">        dump) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus dump;;</span><br><span class="line">        console) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus console;;</span><br><span class="line">        *) echo <span class="string">"Usage: nexus &#123;start|stop|run|run-redirect|status|restart|force-reload&#125;"</span></span><br><span class="line">esac</span><br></pre></td></tr></table></figure>
+<h4 id="设置脚本权限"><a href="#设置脚本权限" class="headerlink" title="设置脚本权限"></a>设置脚本权限</h4><figure class="highlight"><table><tr><td class="code"><pre><span class="line">[root@linux_maven init.d]# chmod +x /etc/init.d/nexus</span><br></pre></td></tr></table></figure>
+<h4 id="使用service命令使用nexus"><a href="#使用service命令使用nexus" class="headerlink" title="使用service命令使用nexus"></a>使用service命令使用nexus</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">[root@linux_maven init.d]# service nexus status</span><br><span class="line"></span><br><span class="line">WARNING: ************************************************************</span><br><span class="line"></span><br><span class="line">WARNING: Detected execution as <span class="string">"root"</span> user.  This is NOT recommended!</span><br><span class="line"></span><br><span class="line">WARNING: ************************************************************</span><br><span class="line"></span><br><span class="line">nexus is running.</span><br></pre></td></tr></table></figure>
+<h4 id="添加到开机启动"><a href="#添加到开机启动" class="headerlink" title="添加到开机启动#"></a>添加到开机启动#</h4><figure class="highlight"><table><tr><td class="code"><pre><span class="line">[root@linux_maven init.d]# chkconfig nexus on</span><br></pre></td></tr></table></figure>
+<h4 id="查看nexus开机启动"><a href="#查看nexus开机启动" class="headerlink" title="查看nexus开机启动"></a>查看nexus开机启动</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">[root@linux_maven ~]# chkconfig --list nexus</span><br><span class="line"></span><br><span class="line">Note: This output shows SysV services only and does not include <span class="keyword">native</span></span><br><span class="line">      systemd services. SysV configuration data might be overridden by <span class="keyword">native</span></span><br><span class="line">      systemd configuration.</span><br><span class="line"> </span><br><span class="line">      If you want to list systemd services use <span class="string">'systemctl list-unit-files'</span>.</span><br><span class="line">      To see services enabled on particular target use</span><br><span class="line">      <span class="string">'systemctl list-dependencies [target]'</span>.</span><br><span class="line"> </span><br><span class="line"></span><br><span class="line">nexus           <span class="number">0</span>:off   <span class="number">1</span>:off   <span class="number">2</span>:on    <span class="number">3</span>:on    <span class="number">4</span>:on    <span class="number">5</span>:on    <span class="number">6</span>:off</span><br></pre></td></tr></table></figure>
+<h4 id="设置防火墙"><a href="#设置防火墙" class="headerlink" title="设置防火墙"></a>设置防火墙</h4><figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 进入防火墙设置文件目录</span></span><br><span class="line">[root@linux_maven init.d]# cd /etc/firewalld/zones/</span><br><span class="line"><span class="comment">// 使用vim, 修改防火墙配置文件</span></span><br><span class="line">[root@linux_maven zones]# vim public.xml</span><br></pre></td></tr></table></figure>
+<p>添加以下放开端口内容, 其它不变</p>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line">&lt;rule family=<span class="string">"ipv4"</span>&gt;</span><br><span class="line">&lt;!-- 开放<span class="number">8081</span>端口给任意ip  --&gt;</span><br><span class="line">　　&lt;port protocol=<span class="string">"tcp"</span> port=<span class="string">"8081"</span>/&gt;</span><br><span class="line">　　&lt;accept/&gt;</span><br><span class="line">&lt;/rule&gt;</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>NEXUS</category>
+      </categories>
+  </entry>
+  <entry>
     <title>MySQL数据库统计信息查询</title>
-    <url>/2020/07/25/7v_zfrTYs/</url>
+    <url>/2020/07/25/MySQL%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%9F%E8%AE%A1%E4%BF%A1%E6%81%AF%E6%9F%A5%E8%AF%A2/</url>
     <content><![CDATA[<h4 id="数据库表数量"><a href="#数据库表数量" class="headerlink" title="数据库表数量"></a>数据库表数量</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">#查询MySQL服务中数据库表数据量</span><br><span class="line"><span class="function">SELECT <span class="title">COUNT</span><span class="params">(*)</span> TABLES, table_schema FROM information_schema.TABLES    GROUP BY table_schema</span>;</span><br><span class="line">#查询指定数据库表数量</span><br><span class="line"><span class="function">SELECT <span class="title">COUNT</span><span class="params">(*)</span> TABLES, table_schema FROM information_schema.TABLES   WHERE table_schema </span>= <span class="string">'szdb'</span></span><br></pre></td></tr></table></figure>
 
 <h4 id="查询数据库字段"><a href="#查询数据库字段" class="headerlink" title="查询数据库字段"></a>查询数据库字段</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">#查询一个表中有多少字段</span><br><span class="line"><span class="function">SELECT <span class="title">COUNT</span><span class="params">(*)</span> FROM information_schema. COLUMNS WHERE table_schema </span>= <span class="string">'szdb'</span> AND table_name = <span class="string">'SystemLog'</span>;</span><br><span class="line">#查询一个数据库中有多少字段</span><br><span class="line"><span class="function">SELECT <span class="title">COUNT</span><span class="params">(column_name)</span> FROM information_schema.COLUMNS WHERE TABLE_SCHEMA </span>= <span class="string">'szdb'</span>;</span><br><span class="line">#查询数据库中所以表、字段、字段类型、注释等信息</span><br><span class="line">SELECT TABLE_NAME, column_name, DATA_TYPE, column_comment FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = <span class="string">'szdb'</span> ;</span><br></pre></td></tr></table></figure>
@@ -44,8 +86,46 @@
       </categories>
   </entry>
   <entry>
+    <title>SVN迁移GIT</title>
+    <url>/2020/07/25/SVN%E8%BF%81%E7%A7%BBGIT/</url>
+    <content><![CDATA[<h4 id="迁移过程"><a href="#迁移过程" class="headerlink" title="迁移过程"></a>迁移过程</h4><ol>
+<li>拉取svn代码并转为git（输入用户名密码） <figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git svn clone   http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure>
+ <img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589770874769.png" alt=""></li>
+<li>关联远程仓库(保证仓库是新建的并且没有任何提交)<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">cd project/</span><br><span class="line">git remote add origin http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure></li>
+<li>提交<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git push -u origin master</span><br></pre></td></tr></table></figure></li>
+</ol>
+]]></content>
+      <categories>
+        <category>SVN</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Springboot项目在cmd窗口运行后台卡顿问题</title>
+    <url>/2020/07/25/Springboot%E9%A1%B9%E7%9B%AE%E5%9C%A8cmd%E7%AA%97%E5%8F%A3%E8%BF%90%E8%A1%8C%E5%90%8E%E5%8F%B0%E5%8D%A1%E9%A1%BF%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<h3 id="1、背景介绍"><a href="#1、背景介绍" class="headerlink" title="1、背景介绍"></a>1、背景介绍</h3><p>项目使用Springboot开发，项目打成jar后，部署在windows环境下，通过命令：java -jar project.jar的方式启动运行。</p>
+<h3 id="2、问题描述"><a href="#2、问题描述" class="headerlink" title="2、问题描述"></a>2、问题描述</h3><p>项目每次启动后，开始时可以正常访问。经过一段时间的运行，通过浏览器系统无法登陆，查看后台日志时，可以看到系统后台卡住，日志不再输出。在CMD窗口输入Ctrl + C，强制结束应用进程后，系统便能正常登录。</p>
+<p>有时，在CMD窗口通过输入回车，后台会将之前卡住的日志全部刷出来，然后便能正常登录，但有时输入回车不起作用。</p>
+<h3 id="3、问题追踪"><a href="#3、问题追踪" class="headerlink" title="3、问题追踪"></a>3、问题追踪</h3><p>当系统后台再次卡住，应用无法访问时，按照如下步骤进行排查定位：</p>
+<ol>
+<li>找到java_home的bin下jvisualvm.exe ，双击运行，即可看到下图界面；<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594706936975.png" alt=""></li>
+<li>点击右侧<strong>“线程Dump”</strong>按钮，保存当前所有线程信息，保存为dump文件，可在左侧点击查看保存内容。<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594706975795.png" alt=""></li>
+<li>在CMD窗口输入：Ctrl+C，强制结束应用线程；</li>
+<li>如第二步操作，再次保存结束线程后，所有线程的快照。<h3 id="4、线程快照分析"><a href="#4、线程快照分析" class="headerlink" title="4、线程快照分析"></a>4、线程快照分析</h3></li>
+<li>线程统计情况对比：<br>Ctrl+C执行前<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707048755.png" alt=""><br>Ctrl+C执行后<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707054231.png" alt=""></li>
+<li>线程执行情况对比：<br>Ctrl+C执行前<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707066715.png" alt=""><br>Ctrl+C执行后<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707072491.png" alt=""></li>
+<li>dump文件内容对比：<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707097297.png" alt=""><br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707102232.png" alt=""><br>执行Ctrl+C线程状态变化的是QuartzScheduler_QuartzSchedulerThread，第二个线程挂起，在等待第一个线程；第一个线程在写日志，但一直处在Runnable状态。<br>结论：定时任务执行时，写日志输出IO阻塞，导致应用后台卡住。<h3 id="5、解决办法"><a href="#5、解决办法" class="headerlink" title="5、解决办法"></a>5、解决办法</h3></li>
+<li>将springboot日志输出，修改为异步的方式输出，避免同步输出阻塞；</li>
+<li>由于windows中cmd存在日志输出bug，导致经常性日志卡住，具体表现为：输出内容卡死问题（命令行卡死不动，但是进程和线程依然再运行），随便敲一下回车键，命令行会马上打印卡死期间输出的信息。这种情况，只需要对cmd窗口进行设置即可：右键窗口标题-属性，把快速编辑模式关掉就能避免这个问题。</li>
+</ol>
+<p>原文链接：<a href="https://blog.csdn.net/qq_40112386/java/article/details/86681247" target="_blank" rel="noopener">https://blog.csdn.net/qq_40112386/java/article/details/86681247</a></p>
+]]></content>
+      <categories>
+        <category>问题</category>
+      </categories>
+  </entry>
+  <entry>
     <title>Nginx监控工具-GoAccess</title>
-    <url>/2020/07/25/BpGxZ4yx7/</url>
+    <url>/2020/07/25/Nginx%E7%9B%91%E6%8E%A7%E5%B7%A5%E5%85%B7-GoAccess/</url>
     <content><![CDATA[<h5 id="Why-GoAccess"><a href="#Why-GoAccess" class="headerlink" title="Why GoAccess?"></a>Why GoAccess?</h5><blockquote>
 <p>GoAccess 被设计成快速的并基于终端的日志分析工具。其核心理念是不需要通过 Web 浏览器就能快速分析并实时查看 Web 服务器的统计数据(这对于需要使用 SSH 来对访问日志进行快速分析或者就是喜欢在终端环境下工作的人来说是超赞的)。<br>终端输出仅仅是默认的输出方式，GoAccess 还支持生成完整的实时 HTML 报告(这对分析、监控以及数据可视化都是极好的)，以及 JSON 和 CSV 格式的报告。</p>
 </blockquote>
@@ -79,59 +159,8 @@
       </categories>
   </entry>
   <entry>
-    <title>Hyper-V和IDEA运行端口占用问题</title>
-    <url>/2020/07/25/fKDxWMjSW/</url>
-    <content><![CDATA[<h4 id="原因分析"><a href="#原因分析" class="headerlink" title="原因分析"></a>原因分析</h4><p>首先我们可以查看一下我们系统默认的端口占用范围；</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">Copy</span><br><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line"></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">1024</span></span><br><span class="line">端口数          : <span class="number">13977</span></span><br></pre></td></tr></table></figure>
-<p>我们可以看到Windows系统默认的tcp 动态端口范围为：1024~13977。当我们开启Hyper-V后，系统默认会分配给一些保留端口供Hyper-V使用：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="class"><span class="keyword">interface</span> <span class="title">ipv4</span> <span class="title">show</span> <span class="title">excludedportrange</span> <span class="title">protocol</span></span>=tcp</span><br><span class="line">协议 tcp 端口排除范围</span><br><span class="line"> </span><br><span class="line">开始端口    结束端口</span><br><span class="line">----------    --------</span><br><span class="line">      <span class="number">1026</span>        <span class="number">1125</span></span><br><span class="line">      <span class="number">1226</span>        <span class="number">1325</span></span><br><span class="line">      <span class="number">1326</span>        <span class="number">1425</span></span><br><span class="line">      <span class="number">1426</span>        <span class="number">1525</span></span><br><span class="line">      <span class="number">1526</span>        <span class="number">1625</span></span><br><span class="line">      <span class="number">2180</span>        <span class="number">2279</span></span><br></pre></td></tr></table></figure>
-<p>我们可以看到IDEA运行Tomcat需要JMX的1099端口刚好在端口排除范围中，这样就导致了IDEA需要使用1099端口是会被占用，这样你当然就不能运行了。</p>
-<h4 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h4><p>使用管理员身份运行cmd，重置端口，然后重启</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh winsock reset</span><br></pre></td></tr></table></figure>
-<p>这样你的tcp端口排除范围可能刚好不包含1099端口，这样你当然就可以用你的IDEA运行Tomcat应用了。但是你啥时候会出现就不得而知了。</p>
-<h4 id="终极解决"><a href="#终极解决" class="headerlink" title="终极解决"></a>终极解决</h4><p>3.1 关闭Hyper-V#</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">Microsoft Windows [版本 <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span>]</span><br><span class="line">(c) <span class="number">2019</span> Microsoft Corporation。保留所有权利。</span><br><span class="line">dism.exe /Online /Disable-Feature:Microsoft-Hyper-V</span><br></pre></td></tr></table></figure>
-<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
-<p>3.2 修改动态端口范围#<br>使用管理员身份运行cmd</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport tcp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br><span class="line">netsh <span class="keyword">int</span> ipv4 set dynamicport udp start=<span class="number">49152</span> num=<span class="number">16383</span></span><br></pre></td></tr></table></figure>
-<p>确定。<br>然后检查结果</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 show dynamicport tcp</span><br><span class="line"></span><br><span class="line">协议 tcp 动态端口范围</span><br><span class="line">---------------------------------</span><br><span class="line">启动端口        : <span class="number">49152</span></span><br><span class="line">端口数          : <span class="number">16383</span></span><br></pre></td></tr></table></figure>
-<p>3.3 开启Hyper-V#</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">dism.exe /Online /Enable-Feature:Microsoft-Hyper-V /All</span><br><span class="line">部署映像服务和管理工具</span><br><span class="line">版本: <span class="number">10.0</span><span class="number">.18362</span><span class="number">.1</span></span><br><span class="line">映像版本: <span class="number">10.0</span><span class="number">.18363</span><span class="number">.752</span></span><br><span class="line">启用一个或多个功能</span><br><span class="line">[==========================<span class="number">100.0</span>%==========================]</span><br><span class="line">操作成功完成。</span><br><span class="line">重新启动 Windows 以完成该操作。</span><br><span class="line">是否立即重新启动计算机? (Y/N)</span><br><span class="line">开启Hyper-V</span><br></pre></td></tr></table></figure>
-<p>或者采用传统方式，在控制面板的“程序和功能”中，找到“Windows功能”，取消Hyper-V的勾选。这两种方法都会要求重启。</p>
-<blockquote>
-<p>使用终极解决方案解决之后，你会发现你的IDEA又可以正常运行了。另外这里说一个单独排除端口的命令，后面可能会用到：</p>
-</blockquote>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">netsh <span class="keyword">int</span> ipv4 add excludedportrange protocol=tcp startport=<span class="number">50051</span> numberofports=<span class="number">1</span></span><br></pre></td></tr></table></figure>
-<p>使用上面的命令之后我们就可以单独排除某个端口了，保障改端口不会被其他应用占用。</p>
-<blockquote>
-<p><a href="https://www.kairlec.com/archives/285" target="_blank" rel="noopener">https://www.kairlec.com/archives/285</a><br><a href="https://www.cnblogs.com/eelve/p/12679125.html" target="_blank" rel="noopener">https://www.cnblogs.com/eelve/p/12679125.html</a></p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>问题</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>Tomcat监控工具</title>
-    <url>/2020/07/25/aEGAJiLzW/</url>
-    <content><![CDATA[<blockquote>
-<p> 作为系统管理员，要能监控系统状态，包括主机状态（硬盘、内存、CPU）和服务状态（GC、Thread）。如果没有工具，需要远程登录到服务器，费时费力。<br> 推荐一款工具Psi-probe，非常强大，可以监控Tomcat发布服务和主机的性能。</p>
-</blockquote>
-<p><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589941600334.png" alt=""></p>
-<h5 id="psi-probe安装"><a href="#psi-probe安装" class="headerlink" title="psi-probe安装"></a>psi-probe安装</h5><ul>
-<li>下载源码，编译war。<br><a href="https://github.com/psi-probe/psi-probe" target="_blank" rel="noopener">https://github.com/psi-probe/psi-probe</a> </li>
-<li>直接下载war<br><a href="https://github.com/psi-probe/psi-probe/releases/download/3.1.0/probe.war" target="_blank" rel="noopener">https://github.com/psi-probe/psi-probe/releases/download/3.1.0/probe.war</a> </li>
-<li>安装probe.war。通过Tomcat Manager Deploy war，或者将probe.war放到Tomcat的webapps目录下。<h5 id="功能简介"><a href="#功能简介" class="headerlink" title="功能简介"></a>功能简介</h5>通过<a href="http://host/probe访问服务。" target="_blank" rel="noopener">http://host/probe访问服务。</a><br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589941685911.png" alt=""></li>
-</ul>
-]]></content>
-      <categories>
-        <category>TOMCAT</category>
-      </categories>
-  </entry>
-  <entry>
     <title>Tomcat8优化实践</title>
-    <url>/2020/07/25/Tked_OlVP/</url>
+    <url>/2020/07/25/Tomcat8%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/</url>
     <content><![CDATA[<blockquote>
 <p>来源：<a href="https://www.jianshu.com/p/b2826ead1c4e" target="_blank" rel="noopener">https://www.jianshu.com/p/b2826ead1c4e</a></p>
 </blockquote>
@@ -151,64 +180,25 @@
       </categories>
   </entry>
   <entry>
-    <title>Hello World</title>
-    <url>/2020/07/24/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html" target="_blank" rel="noopener">Deployment</a></p>
-]]></content>
-  </entry>
-  <entry>
-    <title>Springboot项目在cmd窗口运行后台卡顿问题</title>
-    <url>/2020/07/25/kcMn5UKaj/</url>
-    <content><![CDATA[<h3 id="1、背景介绍"><a href="#1、背景介绍" class="headerlink" title="1、背景介绍"></a>1、背景介绍</h3><p>项目使用Springboot开发，项目打成jar后，部署在windows环境下，通过命令：java -jar project.jar的方式启动运行。</p>
-<h3 id="2、问题描述"><a href="#2、问题描述" class="headerlink" title="2、问题描述"></a>2、问题描述</h3><p>项目每次启动后，开始时可以正常访问。经过一段时间的运行，通过浏览器系统无法登陆，查看后台日志时，可以看到系统后台卡住，日志不再输出。在CMD窗口输入Ctrl + C，强制结束应用进程后，系统便能正常登录。</p>
-<p>有时，在CMD窗口通过输入回车，后台会将之前卡住的日志全部刷出来，然后便能正常登录，但有时输入回车不起作用。</p>
-<h3 id="3、问题追踪"><a href="#3、问题追踪" class="headerlink" title="3、问题追踪"></a>3、问题追踪</h3><p>当系统后台再次卡住，应用无法访问时，按照如下步骤进行排查定位：</p>
-<ol>
-<li>找到java_home的bin下jvisualvm.exe ，双击运行，即可看到下图界面；<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594706936975.png" alt=""></li>
-<li>点击右侧<strong>“线程Dump”</strong>按钮，保存当前所有线程信息，保存为dump文件，可在左侧点击查看保存内容。<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594706975795.png" alt=""></li>
-<li>在CMD窗口输入：Ctrl+C，强制结束应用线程；</li>
-<li>如第二步操作，再次保存结束线程后，所有线程的快照。<h3 id="4、线程快照分析"><a href="#4、线程快照分析" class="headerlink" title="4、线程快照分析"></a>4、线程快照分析</h3></li>
-<li>线程统计情况对比：<br>Ctrl+C执行前<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707048755.png" alt=""><br>Ctrl+C执行后<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707054231.png" alt=""></li>
-<li>线程执行情况对比：<br>Ctrl+C执行前<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707066715.png" alt=""><br>Ctrl+C执行后<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707072491.png" alt=""></li>
-<li>dump文件内容对比：<br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707097297.png" alt=""><br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1594707102232.png" alt=""><br>执行Ctrl+C线程状态变化的是QuartzScheduler_QuartzSchedulerThread，第二个线程挂起，在等待第一个线程；第一个线程在写日志，但一直处在Runnable状态。<br>结论：定时任务执行时，写日志输出IO阻塞，导致应用后台卡住。<h3 id="5、解决办法"><a href="#5、解决办法" class="headerlink" title="5、解决办法"></a>5、解决办法</h3></li>
-<li>将springboot日志输出，修改为异步的方式输出，避免同步输出阻塞；</li>
-<li>由于windows中cmd存在日志输出bug，导致经常性日志卡住，具体表现为：输出内容卡死问题（命令行卡死不动，但是进程和线程依然再运行），随便敲一下回车键，命令行会马上打印卡死期间输出的信息。这种情况，只需要对cmd窗口进行设置即可：右键窗口标题-属性，把快速编辑模式关掉就能避免这个问题。</li>
-</ol>
-<p>原文链接：<a href="https://blog.csdn.net/qq_40112386/java/article/details/86681247" target="_blank" rel="noopener">https://blog.csdn.net/qq_40112386/java/article/details/86681247</a></p>
+    <title>Tomcat监控工具</title>
+    <url>/2020/07/25/Tomcat%E7%9B%91%E6%8E%A7%E5%B7%A5%E5%85%B7/</url>
+    <content><![CDATA[<blockquote>
+<p> 作为系统管理员，要能监控系统状态，包括主机状态（硬盘、内存、CPU）和服务状态（GC、Thread）。如果没有工具，需要远程登录到服务器，费时费力。<br> 推荐一款工具Psi-probe，非常强大，可以监控Tomcat发布服务和主机的性能。</p>
+</blockquote>
+<p><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589941600334.png" alt=""></p>
+<h5 id="psi-probe安装"><a href="#psi-probe安装" class="headerlink" title="psi-probe安装"></a>psi-probe安装</h5><ul>
+<li>下载源码，编译war。<br><a href="https://github.com/psi-probe/psi-probe" target="_blank" rel="noopener">https://github.com/psi-probe/psi-probe</a> </li>
+<li>直接下载war<br><a href="https://github.com/psi-probe/psi-probe/releases/download/3.1.0/probe.war" target="_blank" rel="noopener">https://github.com/psi-probe/psi-probe/releases/download/3.1.0/probe.war</a> </li>
+<li>安装probe.war。通过Tomcat Manager Deploy war，或者将probe.war放到Tomcat的webapps目录下。<h5 id="功能简介"><a href="#功能简介" class="headerlink" title="功能简介"></a>功能简介</h5>通过<a href="http://host/probe访问服务。" target="_blank" rel="noopener">http://host/probe访问服务。</a><br><img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589941685911.png" alt=""></li>
+</ul>
 ]]></content>
       <categories>
-        <category>问题</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>SVN迁移GIT</title>
-    <url>/2020/07/25/mkm2IT70s/</url>
-    <content><![CDATA[<h4 id="迁移过程"><a href="#迁移过程" class="headerlink" title="迁移过程"></a>迁移过程</h4><ol>
-<li>拉取svn代码并转为git（输入用户名密码） <figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git svn clone   http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure>
- <img src= "/img/loading.gif" data-src="https://1557100211.github.io/post-images/1589770874769.png" alt=""></li>
-<li>关联远程仓库(保证仓库是新建的并且没有任何提交)<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">cd project/</span><br><span class="line">git remote add origin http:<span class="comment">//xxxx.com/project</span></span><br></pre></td></tr></table></figure></li>
-<li>提交<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">git push -u origin master</span><br></pre></td></tr></table></figure></li>
-</ol>
-]]></content>
-      <categories>
-        <category>SVN</category>
+        <category>TOMCAT</category>
       </categories>
   </entry>
   <entry>
     <title>Nexus从windows迁移至Linux</title>
-    <url>/2020/07/25/sD6FTsLeh/</url>
+    <url>/2020/07/25/Nexus%E4%BB%8Ewindows%E8%BF%81%E7%A7%BB%E8%87%B3Linux/</url>
     <content><![CDATA[<h4 id="下载nexus-linux包"><a href="#下载nexus-linux包" class="headerlink" title="下载nexus linux包"></a>下载nexus linux包</h4><p>官网下载地址：<a href="https://www.sonatype.com/download-oss-sonatype" target="_blank" rel="noopener">https://www.sonatype.com/download-oss-sonatype</a><br>将软件包上传至服务器–&gt;创建nexus目录 –&gt;创建用户–&gt;解压缩包–&gt;将原平台文件包迁移至nexus目录–&gt;授权–&gt;启动：</p>
 <ol>
 <li><p>创建用户</p>
@@ -234,30 +224,43 @@
       </categories>
   </entry>
   <entry>
-    <title>IntelliJ IDEA必装插件</title>
-    <url>/2020/07/25/sgUTJX1IO/</url>
-    <content><![CDATA[<p>1</p>
+    <title>Hello World</title>
+    <url>/2020/07/24/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html" target="_blank" rel="noopener">Deployment</a></p>
 ]]></content>
+  </entry>
+  <entry>
+    <title>Tomcat配置JMX</title>
+    <url>/2020/10/21/Tomcat%E9%85%8D%E7%BD%AEJMX/</url>
+    <content><![CDATA[<h4 id="配置JMX"><a href="#配置JMX" class="headerlink" title="配置JMX"></a>配置JMX</h4><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">-Dcom.sun.management.jmxremote.port&#x3D;12321</span><br><span class="line">-Dcom.sun.management.jmxremote.ssl&#x3D;false</span><br><span class="line">-Dcom.sun.management.jmxremote.authenticate&#x3D;false</span><br></pre></td></tr></table></figure>]]></content>
       <categories>
-        <category>IDEA</category>
+        <category>TOMCAT</category>
       </categories>
   </entry>
   <entry>
-    <title>CentOS7配置nexus开机自启动</title>
-    <url>/2020/07/25/tlHAvqFm6/</url>
-    <content><![CDATA[<h4 id="新建nexus启动脚本"><a href="#新建nexus启动脚本" class="headerlink" title="新建nexus启动脚本"></a>新建nexus启动脚本</h4><p>进入/etc/init.d目录，新建脚本文件nexus</p>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 进入/etc/init.d</span></span><br><span class="line">[root@linux_maven etc]# cd /etc/init.d/</span><br><span class="line"> </span><br><span class="line"><span class="comment">// 新建脚本文件nexus</span></span><br><span class="line">[root@linux_maven init.d]# vim nexus</span><br></pre></td></tr></table></figure>
-<p>脚本内容:</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line">#chkconfig:2345 20 90</span><br><span class="line">#description:nexus</span><br><span class="line">#processname:nexus</span><br><span class="line"> </span><br><span class="line">export JAVA_HOME=/root/apps/jdk1<span class="number">.8</span>/</span><br><span class="line"> </span><br><span class="line"><span class="keyword">case</span> $<span class="number">1</span> in</span><br><span class="line">        start) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus start;;</span><br><span class="line">        stop) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus stop;;</span><br><span class="line">        status) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus status;;</span><br><span class="line">        restart) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus restart;;</span><br><span class="line">        dump) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus dump;;</span><br><span class="line">        console) su root /usr/local/nexus3<span class="number">.21</span>/bin/nexus console;;</span><br><span class="line">        *) echo <span class="string">"Usage: nexus &#123;start|stop|run|run-redirect|status|restart|force-reload&#125;"</span></span><br><span class="line">esac</span><br></pre></td></tr></table></figure>
-<h4 id="设置脚本权限"><a href="#设置脚本权限" class="headerlink" title="设置脚本权限"></a>设置脚本权限</h4><figure class="highlight"><table><tr><td class="code"><pre><span class="line">[root@linux_maven init.d]# chmod +x /etc/init.d/nexus</span><br></pre></td></tr></table></figure>
-<h4 id="使用service命令使用nexus"><a href="#使用service命令使用nexus" class="headerlink" title="使用service命令使用nexus"></a>使用service命令使用nexus</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">[root@linux_maven init.d]# service nexus status</span><br><span class="line"></span><br><span class="line">WARNING: ************************************************************</span><br><span class="line"></span><br><span class="line">WARNING: Detected execution as <span class="string">"root"</span> user.  This is NOT recommended!</span><br><span class="line"></span><br><span class="line">WARNING: ************************************************************</span><br><span class="line"></span><br><span class="line">nexus is running.</span><br></pre></td></tr></table></figure>
-<h4 id="添加到开机启动"><a href="#添加到开机启动" class="headerlink" title="添加到开机启动#"></a>添加到开机启动#</h4><figure class="highlight"><table><tr><td class="code"><pre><span class="line">[root@linux_maven init.d]# chkconfig nexus on</span><br></pre></td></tr></table></figure>
-<h4 id="查看nexus开机启动"><a href="#查看nexus开机启动" class="headerlink" title="查看nexus开机启动"></a>查看nexus开机启动</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">[root@linux_maven ~]# chkconfig --list nexus</span><br><span class="line"></span><br><span class="line">Note: This output shows SysV services only and does not include <span class="keyword">native</span></span><br><span class="line">      systemd services. SysV configuration data might be overridden by <span class="keyword">native</span></span><br><span class="line">      systemd configuration.</span><br><span class="line"> </span><br><span class="line">      If you want to list systemd services use <span class="string">'systemctl list-unit-files'</span>.</span><br><span class="line">      To see services enabled on particular target use</span><br><span class="line">      <span class="string">'systemctl list-dependencies [target]'</span>.</span><br><span class="line"> </span><br><span class="line"></span><br><span class="line">nexus           <span class="number">0</span>:off   <span class="number">1</span>:off   <span class="number">2</span>:on    <span class="number">3</span>:on    <span class="number">4</span>:on    <span class="number">5</span>:on    <span class="number">6</span>:off</span><br></pre></td></tr></table></figure>
-<h4 id="设置防火墙"><a href="#设置防火墙" class="headerlink" title="设置防火墙"></a>设置防火墙</h4><figure class="highlight"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 进入防火墙设置文件目录</span></span><br><span class="line">[root@linux_maven init.d]# cd /etc/firewalld/zones/</span><br><span class="line"><span class="comment">// 使用vim, 修改防火墙配置文件</span></span><br><span class="line">[root@linux_maven zones]# vim public.xml</span><br></pre></td></tr></table></figure>
-<p>添加以下放开端口内容, 其它不变</p>
-<figure class="highlight"><table><tr><td class="code"><pre><span class="line">&lt;rule family=<span class="string">"ipv4"</span>&gt;</span><br><span class="line">&lt;!-- 开放<span class="number">8081</span>端口给任意ip  --&gt;</span><br><span class="line">　　&lt;port protocol=<span class="string">"tcp"</span> port=<span class="string">"8081"</span>/&gt;</span><br><span class="line">　　&lt;accept/&gt;</span><br><span class="line">&lt;/rule&gt;</span><br></pre></td></tr></table></figure>]]></content>
+    <title>Mybatis中tinyint(1)转化为boolean</title>
+    <url>/2020/07/25/mybatis-zhong-tinyint1zhuan-hua-wei-boolean/</url>
+    <content><![CDATA[<h4 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述:"></a>问题描述:</h4><p>使用Mybatis查询tinyint(1)字段数据,返回值为Map类型,那么tinyint(1)的数据默认会转化为boolean类型数据.</p>
+<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案:"></a>解决方案:</h4><ol>
+<li>使用ifnull(column, 0)处理该字段,个人测试过可以;</li>
+<li>在jdbcUrl添加参数: tinyInt1isBit=false（默认为true）；</li>
+<li>避免使用长度为1的tinyint类型字段存储数字格式的数据;</li>
+</ol>
+]]></content>
       <categories>
-        <category>NEXUS</category>
+        <category>MYBATIS</category>
       </categories>
   </entry>
   <entry>
@@ -277,7 +280,7 @@
   </entry>
   <entry>
     <title>优秀源码推荐</title>
-    <url>/2020/07/25/you-xiu-yuan-ma-tui-jian/</url>
+    <url>/2020/07/25/%E4%BC%98%E7%A7%80%E6%BA%90%E7%A0%81%E6%8E%A8%E8%8D%90/</url>
     <content><![CDATA[<p>工程</p>
 ]]></content>
       <categories>
@@ -285,17 +288,51 @@
       </categories>
   </entry>
   <entry>
-    <title>Mybatis中tinyint(1)转化为boolean</title>
-    <url>/2020/07/25/mybatis-zhong-tinyint1zhuan-hua-wei-boolean/</url>
-    <content><![CDATA[<h4 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述:"></a>问题描述:</h4><p>使用Mybatis查询tinyint(1)字段数据,返回值为Map类型,那么tinyint(1)的数据默认会转化为boolean类型数据.</p>
-<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案:"></a>解决方案:</h4><ol>
-<li>使用ifnull(column, 0)处理该字段,个人测试过可以;</li>
-<li>在jdbcUrl添加参数: tinyInt1isBit=false（默认为true）；</li>
-<li>避免使用长度为1的tinyint类型字段存储数字格式的数据;</li>
+    <title>问题总结</title>
+    <url>/2020/07/25/%E9%97%AE%E9%A2%98%E6%80%BB%E7%BB%93/</url>
+    <content><![CDATA[<blockquote>
+<p>线上同事发现了一个问题，更新常量类里面的常量后发现没出现效果，反编译后看结果没变….后续查资料结果：<br>程序中使用的各种常量用一个类来统一管理，类似：</p>
+</blockquote>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppConst</span> </span>&#123;  </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_1 = <span class="string">"String1"</span>;  </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_2 = <span class="string">"String2"</span>;  </span><br><span class="line">    ......  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后在某些逻辑代码段里使用了这些常量。这样做可以便于管理常量，避免了大量的magic number/text，在修改常量内容时只需改这一个类就行了，但有时候会奇怪地发现，重新编译打包的程序依旧我行我素，并没有即时反应我们对常量的修改，这是何解呢？<br>在之前的《JVM学习笔记三–类的初始化》中我曾提到，静态常量（即用 static final 修饰的变量）是编译时常量，当一个class文件编译完毕，它内部使用到的所有常量的具体值就已经确定了，不能想当然地以为它在运行时并连接常量管理类之 后才会以引用方式使用常量。比如下面这段代码：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> AppConst;  </span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SomeService</span> </span>&#123;  </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">serviceJob1</span><span class="params">()</span> </span>&#123;  </span><br><span class="line">        System.out.println(AppConst.STR_1);  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>类SomeService使用了STR_1这个常量，表面上是通过AppConst类取得的这个值，实际上在SomeService被编译后，其代码其实变成了</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SomeService</span> </span>&#123;  </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">serviceJob1</span><span class="params">()</span> </span>&#123;  </span><br><span class="line">        System.out.println(<span class="string">"String1"</span>);  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里面根本没有AppConst什么事，所以你即使修改了AppConst的相关常量，令STR_1 = “NotString1”,SomeService可能依然会打印”String1”,因为SomeService的代码没有任何修改，在增量编译的情况 下，它的class文件不会被重新编译。<br>明白了上面这些，大致就知道怎么办了，我的方法有两个：</p>
+<ol>
+<li>原始条件下，删除class文件后手动重编译。</li>
+<li>使用IDE的时候， 先对SomeService做一个细微修改并保存（会自动编译），然后再修改回来并保存（再次自动编译）。如此class文件就会被更新了。<br>是这样的，单纯的修改静态变量是没用的，还要重新编辑所有引用静态变量的类，不然不会生效的。<br>改成 <figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppConst</span> </span>&#123;    </span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="title">getString2</span><span class="params">()</span></span>&#123;   </span><br><span class="line">              <span class="keyword">return</span> <span class="string">"String2"</span>;    </span><br><span class="line">  &#125;   </span><br><span class="line">  ......    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+就可以仅仅修改并编译一个类就行了 .<br>从根本上来解决此问题得这么做，最简单。<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppConst</span> </span>&#123;     </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_1 = <span class="keyword">new</span> String(<span class="string">"String1"</span>);     </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String STR_2 = <span class="keyword">new</span> String(<span class="string">"String2"</span>);     </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> number1=<span class="keyword">new</span> Integer(<span class="number">123</span>);   </span><br><span class="line">    ......     </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+反编译，你会发现在引用此静态类属性的时候，引用代码不是直接用具体值替代，而还是源代码里的引用。<blockquote>
+<p>一句话总结，在静态类里定义的静态属性，坚决不用引用类型，而需要用对象类型。</p>
+</blockquote>
+</li>
 </ol>
 ]]></content>
       <categories>
-        <category>MYBATIS</category>
+        <category>问题</category>
       </categories>
+  </entry>
+  <entry>
+    <title>Tomcat7迁移Tomcat8中文乱码问题</title>
+    <url>/2020/10/22/Tomcat7%E8%BF%81%E7%A7%BBTomcat8%E4%B8%AD%E6%96%87%E4%B9%B1%E7%A0%81%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><blockquote>
+<p>线上工程原用Tomcat7,改用Tomcat8以后发生登录不上去。定位问题是发现是由于乱码JS加载失败。<br>因为win10系统的默认字符集是GBK，而 java 虚拟机在启动时，会读取该字符集。而我们的项目一般会设置为 UTF-8。而 Tomcat 本质上也是依赖于 JDK，所以自然会出现中文乱码。</p>
+</blockquote>
+<h4 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h4><ul>
+<li>Tomcat7对URI默认编码是ISO-8859-1</li>
+<li>Tomcat8对URI默认编码是UTF-8</li>
+</ul>
+<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h4><p>设置tomcat中catalina.bat</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">set &quot;JAVA_OPTS&#x3D;%JAVA_OPTS% -Dfile.encoding&#x3D;UTF-8&quot;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+</blockquote>
+<ul>
+<li>引用1：<a href="https://my.oschina.net/ijustdoit/blog/397481" target="_blank" rel="noopener">https://my.oschina.net/ijustdoit/blog/397481</a></li>
+<li>引用2: <a href="https://www.jianshu.com/p/bb7d3d986796" target="_blank" rel="noopener">https://www.jianshu.com/p/bb7d3d986796</a></li>
+</ul>
+]]></content>
   </entry>
 </search>
